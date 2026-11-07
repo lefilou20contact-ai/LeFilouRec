@@ -13,10 +13,14 @@ jobs:
         include:
           - os: windows-latest
             name: windows
+            label: Windows
           - os: ubuntu-latest
             name: linux
+            label: Linux
           - os: macos-latest
             name: macos
+            label: macOS
+    name: Build ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     # macOS est facultatif : son échec ne bloque pas le reste
     continue-on-error: ${{ matrix.name == 'macos' }}
@@ -33,36 +37,52 @@ jobs:
       - name: Vérifier tkinter
         run: python -c "import tkinter; print('Tk', tkinter.TkVersion)"
 
-      - name: Build Windows (FFmpeg inclus)
+      - name: Icône
+        run: python make_icon.py
+
+      # ---------------- Windows : installateur .exe (Inno Setup) ----------------
+      - name: Build Windows (installateur)
         if: matrix.name == 'windows'
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --windowed --name LeFilouRec --collect-submodules pynput recorder.py
+          $ver = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.0.0' }
+          pyinstaller --noconfirm --windowed --name LeFilouRec --icon icon.ico --collect-submodules pynput recorder.py
           Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp
           $ff = Get-ChildItem ffmpeg_tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1
           Copy-Item $ff.FullName dist/LeFilouRec/ffmpeg.exe
-          Compress-Archive -Path dist/LeFilouRec -DestinationPath LeFilouRec-windows.zip
+          choco install innosetup -y --no-progress
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=$ver" installer/windows.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Build Linux
+      # ---------------- Linux : .deb + AppImage ----------------
+      - name: Build Linux (.deb + AppImage)
         if: matrix.name == 'linux'
         run: |
-          pyinstaller --noconfirm --name LeFilouRec --collect-submodules pynput recorder.py
-          tar -czf LeFilouRec-linux.tar.gz -C dist LeFilouRec
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then VER="${GITHUB_REF_NAME#v}"; else VER="0.0.0"; fi
+          pyinstaller --noconfirm --onefile --name LeFilouRec --collect-submodules pynput recorder.py
+          bash installer/linux.sh "$VER"
 
-      - name: Build macOS
+      # ---------------- macOS : .dmg ----------------
+      - name: Build macOS (.dmg)
         if: matrix.name == 'macos'
         run: |
           pyinstaller --noconfirm --windowed --name LeFilouRec --osx-bundle-identifier fr.lefilou.rec --collect-submodules pynput recorder.py
-          ditto -c -k --keepParent dist/LeFilouRec.app LeFilouRec-macos.zip
+          mkdir dmg
+          cp -R dist/LeFilouRec.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "LeFilou Rec" -srcfolder dmg -ov -format UDZO LeFilouRec-macos.dmg
 
       - uses: actions/upload-artifact@v4
         with:
           name: LeFilouRec-${{ matrix.name }}
           path: |
-            LeFilouRec-windows.zip
-            LeFilouRec-linux.tar.gz
-            LeFilouRec-macos.zip
+            LeFilouRec-Setup-windows.exe
+            LeFilouRec-linux-amd64.deb
+            LeFilouRec-linux-x86_64.AppImage
+            LeFilouRec-macos.dmg
           if-no-files-found: error
 
   release:
@@ -78,4 +98,5 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
+          name: LeFilou Rec ${{ github.ref_name }}
           files: artifacts/*

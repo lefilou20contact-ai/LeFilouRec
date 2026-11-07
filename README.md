@@ -5,13 +5,16 @@ Interface Tkinter (quelques dizaines de Mo de RAM) ; la capture et l'encodage so
 avec encodeur matériel (NVENC, QuickSync, AMF, VAAPI, VideoToolbox) quand il est disponible, sinon x264 `ultrafast`.
 
 ## Compiler sur GitHub
-1. Crée un dépôt et pousse ces fichiers (`recorder.py`, `requirements.txt`, `.github/`).
-2. Onglet **Actions** > **Build** > *Run workflow* (ou pousse un tag `v1.0.0` pour créer une release avec les 3 versions).
-3. Télécharge les artefacts : `LeFilouRec-windows.zip`, `LeFilouRec-linux.tar.gz`, `LeFilouRec-macos.zip`.
+1. Pousse ces fichiers dans un dépôt (`recorder.py`, `make_icon.py`, `requirements.txt`, `installer/`, `.github/`).
+2. Pousse un tag : `git tag v1.0.0 && git push origin v1.0.0` (trois nombres). Le workflow **Build** crée une release avec les installateurs :
+   - Windows : `LeFilouRec-Setup-windows.exe` (installateur, raccourcis, désinstallation, FFmpeg inclus)
+   - Linux : `LeFilouRec-linux-amd64.deb` (installe FFmpeg automatiquement) et `LeFilouRec-linux-x86_64.AppImage` (`chmod +x` puis lancer)
+   - macOS : `LeFilouRec-macos.dmg` (glisser dans Applications)
+3. Sans tag, « Run workflow » donne les mêmes fichiers dans l'onglet Actions (artefacts zippés par GitHub).
 
 ## FFmpeg
 - **Windows** : `ffmpeg.exe` est inclus dans le zip.
-- **Linux** : `sudo apt install ffmpeg` (le programme utilise celui du système).
+- **Linux** : le `.deb` installe FFmpeg tout seul ; avec l'AppImage : `sudo apt install ffmpeg`.
 - **macOS** : `brew install ffmpeg`.
 - Sinon, indique le chemin dans *Performances > Chemin de FFmpeg*.
 
