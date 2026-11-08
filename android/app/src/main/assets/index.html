@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>LeFilou Remote</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:sans-serif;background:#14141a;color:#eee;padding:28px 20px;text-align:center}
+h1{font-size:22px}
+p{color:#9a9aa8;font-size:14px;line-height:1.5}
+input{width:100%;padding:16px;font-size:20px;text-align:center;border-radius:12px;border:1px solid #333;background:#1f1f28;color:#fff;margin:10px 0}
+button{width:100%;border:0;border-radius:14px;padding:18px;font-size:18px;font-weight:600;color:#fff;background:#e22832}
+#err{display:none;background:#7a1620;border-radius:12px;padding:12px;margin:14px 0}
+</style></head><body>
+<h1>&#9679; LeFilou Remote</h1>
+<div id="err">Impossible de joindre le PC. V&eacute;rifie qu'il est allum&eacute;, que la t&eacute;l&eacute;commande est activ&eacute;e et que vous &ecirc;tes sur le m&ecirc;me Wi-Fi.</div>
+<p>Entre l'adresse affich&eacute;e dans le logiciel sur le PC (en bas de l'onglet &laquo; Enregistrer &raquo;).</p>
+<input id="addr" placeholder="192.168.1.20:8765" inputmode="url" autocomplete="off" autocapitalize="off">
+<button id="go">Se connecter</button>
+<script>
+var q = new URLSearchParams(location.search);
+var saved = localStorage.getItem("pc") || "";
+document.getElementById("addr").value = saved;
+if (q.get("error")) document.getElementById("err").style.display = "block";
+function go() {
+  var a = document.getElementById("addr").value.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  if (!a) return;
+  if (a.indexOf(":") < 0) a += ":8765";
+  localStorage.setItem("pc", a);
+  location.href = "http://" + a + "/";
+}
+document.getElementById("go").onclick = go;
+if (saved && !q.get("edit") && !q.get("error")) go();
+</script></body></html>

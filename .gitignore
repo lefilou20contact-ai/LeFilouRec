@@ -11,3 +11,7 @@ dmg/
 *.AppImage
 *.exe
 *.dmg
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties

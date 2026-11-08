@@ -6,13 +6,18 @@ Interface Tkinter (quelques dizaines de Mo de RAM) + FFmpeg pour la capture et
 l'encodage (encodeurs matériels NVENC / QuickSync / AMF / VAAPI / VideoToolbox
 ou x264 en secours). Aucun traitement vidéo n'est fait en Python.
 """
+import collections
 import glob
+import hmac
+import http.server
 import json
 import os
 import queue
 import re
 import shlex
+import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -83,6 +88,9 @@ DEFAULTS = {
     # Performances & avancé
     "priority": "below", "threads": 2, "rtbuf_mb": 64, "thread_queue": 512, "log_level": "warning",
     "ffmpeg_path": "", "extra_output_args": "",
+    # Télécommande (téléphone)
+    "remote_enabled": False, "remote_port": 8765, "remote_pin": "", "remote_notify": True,
+    "ram_warn": 90, "remote_timeout": 8,
 }
 
 CHOICES = {
@@ -171,6 +179,14 @@ SCHEMA = [
         ("ffmpeg_path", "Chemin de FFmpeg", "file", "Vide = automatique."),
         ("extra_output_args", "Arguments FFmpeg supplémentaires", "str", "Ajoutés avant le fichier de sortie."),
     ]),
+    ("Télécommande", [
+        ("remote_enabled", "Activer la télécommande", "bool", "Le téléphone doit être sur le même Wi-Fi que le PC."),
+        ("remote_port", "Port", "int", "Change-le si 8765 est déjà pris."),
+        ("remote_pin", "Code PIN", "str", "Demandé par le téléphone (4 caractères minimum)."),
+        ("remote_notify", "Alerter sur le PC si le téléphone se déconnecte", "bool", "Fenêtre + bip, avec la cause probable."),
+        ("ram_warn", "Seuil d'alerte mémoire (%)", "int", "Alerte quand la RAM du PC dépasse ce seuil."),
+        ("remote_timeout", "Délai avant « déconnecté » (s)", "int", "Sans nouvelles du téléphone pendant ce temps."),
+    ]),
 ]
 KIND = {k: kind for _, fields in SCHEMA for k, _, kind, _ in fields}
 
@@ -224,7 +240,7 @@ def run(cmd, timeout=15):
     kw = {"creationflags": NOWIN} if PLAT == "win" else {}
     try:
         return subprocess.run(cmd, capture_output=True, text=True, errors="replace",
-                              timeout=timeout, **kw)
+                              timeout=timeout, stdin=subprocess.DEVNULL, **kw)
     except Exception:
         return None
 
@@ -511,6 +527,198 @@ def fmt_size(n):
 
 
 # --------------------------------------------------------------------------- #
+#  Mémoire du PC + télécommande réseau (serveur HTTP local)
+# --------------------------------------------------------------------------- #
+def ram_percent():
+    """Pourcentage de RAM utilisée (-1 si inconnu)."""
+    try:
+        if PLAT == "win":
+            class MS(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("sullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            m = MS()
+            m.dwLength = ctypes.sizeof(MS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+            return float(m.dwMemoryLoad)
+        if PLAT == "linux":
+            info = {}
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    k, v = line.split(":", 1)
+                    info[k] = int(v.split()[0])
+            return round(100 * (1 - info["MemAvailable"] / info["MemTotal"]), 1)
+        total = int(run(["sysctl", "-n", "hw.memsize"], 3).stdout)
+        out = run(["vm_stat"], 3).stdout
+        page = int(re.search(r"page size of (\d+)", out).group(1))
+
+        def pages(name):
+            m = re.search(name + r":\s+(\d+)", out)
+            return int(m.group(1)) if m else 0
+        avail = (pages("Pages free") + pages("Pages inactive") + pages("Pages speculative")) * page
+        return round(100 * (1 - avail / total), 1)
+    except Exception:
+        return -1.0
+
+
+def local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except OSError:
+        return "127.0.0.1"
+
+
+REMOTE_HTML = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>LeFilou Remote</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,sans-serif;background:#14141a;color:#eee;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
+h1{font-size:18px;margin:6px 0 2px}
+#conn{font-size:13px;color:#9a9;margin-bottom:12px}
+#conn.bad{color:#f66}
+#time{font-size:56px;font-variant-numeric:tabular-nums;margin:18px 0 4px}
+#size{color:#999;margin-bottom:22px}
+button{width:100%;max-width:420px;border:0;border-radius:16px;padding:22px;font-size:20px;font-weight:600;color:#fff;background:#e22832;margin:8px 0}
+button.stop{background:#444}
+button.sec{background:#2b2b36;font-size:16px;padding:16px}
+button:disabled{opacity:.5}
+.bar{width:100%;max-width:420px;height:10px;background:#2b2b36;border-radius:6px;overflow:hidden;margin:18px auto 0}
+#ramfill{height:100%;width:0;background:#3c9;transition:width .4s}
+#ramtxt{font-size:13px;color:#999;margin-top:6px}
+#alert{display:none;background:#7a1620;border-radius:12px;padding:12px;margin-top:14px}
+#login{display:none;width:100%;max-width:420px;text-align:center}
+input{width:100%;padding:16px;font-size:22px;text-align:center;border-radius:12px;border:1px solid #333;background:#1f1f28;color:#fff;letter-spacing:6px;margin-bottom:8px}
+#msg{min-height:20px;color:#9bd;margin-top:8px;font-size:14px;text-align:center}
+</style></head><body>
+<h1>&#9679; LeFilou Rec - t&eacute;l&eacute;commande</h1>
+<div id="conn"></div>
+<div id="login"><p>Entre le code PIN affich&eacute; sur le PC</p>
+<input id="pin" type="tel" inputmode="numeric" autocomplete="off"><button id="ok">Se connecter</button></div>
+<div id="main" style="display:none;width:100%;max-width:420px;text-align:center">
+<div id="time">00:00:00</div><div id="size"></div>
+<button id="rec">&#9679; D&eacute;marrer</button>
+<button id="shot" class="sec">Capture d'&eacute;cran</button>
+<div class="bar"><div id="ramfill"></div></div><div id="ramtxt"></div>
+<div id="alert"></div></div>
+<div id="msg"></div>
+<script>
+var $=function(i){return document.getElementById(i)},pin=localStorage.getItem("pin")||"",snap=null,fails=0;
+function fmt(s){var h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;return [h,m,x].map(function(v){return String(v).padStart(2,"0")}).join(":")}
+function api(path,method){
+  var ctl=new AbortController(),t=setTimeout(function(){ctl.abort()},4000);
+  return fetch(path,{method:method||"GET",headers:{"X-Pin":pin},signal:ctl.signal,cache:"no-store"}).then(function(r){
+    clearTimeout(t);return r.json().then(function(j){return {status:r.status,data:j}})});
+}
+function showLogin(){$("login").style.display="block";$("main").style.display="none"}
+function poll(){
+  api("/api/status").then(function(r){
+    if(r.status===401||r.status===429){pin="";localStorage.removeItem("pin");showLogin();
+      $("conn").textContent="";$("msg").textContent=r.data.error||"";return}
+    snap=r.data;fails=0;
+    $("login").style.display="none";$("main").style.display="block";
+    $("conn").textContent="Connect\u00e9 au PC";$("conn").className="";
+    $("time").textContent=fmt(snap.elapsed);
+    $("size").textContent=snap.recording?(snap.size/1048576).toFixed(1)+" Mo - "+snap.encoder:snap.status;
+    var b=$("rec");
+    b.textContent=snap.stopping?"Finalisation\u2026":(snap.recording?"\u25a0 Arr\u00eater":"\u25cf D\u00e9marrer");
+    b.className=snap.recording?"stop":"";b.disabled=snap.stopping;
+    var ram=snap.ram;
+    $("ramfill").style.width=Math.max(0,ram)+"%";
+    $("ramfill").style.background=snap.ram_alert?"#e55":"#3c9";
+    $("ramtxt").textContent="RAM du PC : "+(ram<0?"?":ram.toFixed(0)+" %");
+    var a=$("alert");
+    if(snap.ram_alert){a.style.display="block";a.textContent="M\u00e9moire du PC presque satur\u00e9e ("+ram.toFixed(0)+" %)";
+      if(navigator.vibrate)navigator.vibrate(200)}else a.style.display="none";
+  }).catch(function(){fails++;$("conn").textContent="Connexion perdue\u2026 ("+fails+")";$("conn").className="bad"});
+}
+function act(p){
+  api(p,"POST").then(function(r){
+    $("msg").textContent=r.data.ok?"OK":(r.data.error||"");
+    setTimeout(function(){$("msg").textContent=""},2000);poll();
+  }).catch(function(){$("msg").textContent="\u00c9chec de la commande"});
+}
+$("rec").onclick=function(){act(snap&&snap.recording?"/api/stop":"/api/start")};
+$("shot").onclick=function(){act("/api/screenshot")};
+$("ok").onclick=function(){pin=$("pin").value.trim();localStorage.setItem("pin",pin);poll()};
+if(pin){poll()}else{showLogin()}
+setInterval(function(){if(pin)poll()},2000);
+</script></body></html>"""
+
+
+class RemoteServer:
+    """Mini serveur HTTP : page de télécommande + API protégée par PIN (réseau local)."""
+
+    def __init__(self, app, port, pin):
+        self.app, self.pin = app, pin
+        self.fails = {}
+        outer = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def _send(self, code, body, ctype="application/json"):
+                data = body.encode("utf-8")
+                self.send_response(code)
+                self.send_header("Content-Type", ctype + "; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+
+            def _auth(self):
+                ip = self.client_address[0]
+                count, until = outer.fails.get(ip, (0, 0.0))
+                if until > time.monotonic():
+                    self._send(429, json.dumps({"error": "Trop d'essais, attends une minute."}))
+                    return False
+                if hmac.compare_digest(self.headers.get("X-Pin", "").encode(), outer.pin.encode()):
+                    outer.fails.pop(ip, None)
+                    return True
+                count += 1
+                outer.fails[ip] = (0, time.monotonic() + 60) if count >= 5 else (count, 0.0)
+                self._send(401, json.dumps({"error": "PIN incorrect"}))
+                return False
+
+            def do_GET(self):
+                if self.path in ("/", "/index.html"):
+                    self._send(200, REMOTE_HTML, "text/html")
+                elif self.path.startswith("/api/status"):
+                    if self._auth():
+                        outer.app.remote_seen(self.client_address[0])
+                        self._send(200, json.dumps(outer.app.snap))
+                else:
+                    self._send(404, json.dumps({"error": "introuvable"}))
+
+            def do_POST(self):
+                cmds = {"/api/start": "remote_start", "/api/stop": "remote_stop", "/api/screenshot": "shot"}
+                if self.path in cmds:
+                    if self._auth():
+                        outer.app.remote_seen(self.client_address[0])
+                        outer.app.q.put((cmds[self.path], None))
+                        self._send(200, json.dumps({"ok": True}))
+                else:
+                    self._send(404, json.dumps({"error": "introuvable"}))
+
+        self.httpd = http.server.ThreadingHTTPServer(("0.0.0.0", port), Handler)
+
+    def start(self):
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def stop(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+# --------------------------------------------------------------------------- #
 #  Raccourcis clavier (pynput)
 # --------------------------------------------------------------------------- #
 def hk_mod(kb, k):
@@ -557,17 +765,28 @@ class App:
             except tk.TclError:
                 pass
         self.cfg = load_config()
+        if not self.cfg["remote_pin"]:
+            self.cfg["remote_pin"] = f"{secrets.randbelow(10 ** 6):06d}"
+            save_config(self.cfg)
         self.vars, self.devboxes = {}, []
         self.q = queue.Queue()
         self.proc = self.logf = self.hk = self.cap_listener = self.cap_win = None
         self.recording = self.stopping = self.counting = False
-        self.t0 = self.last_ui = 0.0
+        self.t0 = self.last_tick = 0.0
+        self.remote, self.remote_url, self.remote_last = None, "", 0.0
+        self.phone_connected = self.phone_lost = self.ram_alerted = False
+        self.ram_samples = collections.deque(maxlen=20)
+        self.last_size = 0
+        self.snap = {"recording": False, "stopping": False, "elapsed": 0, "size": 0, "status": "Prêt.",
+                     "encoder": "", "ram": -1.0, "ram_alert": False}
+        self._bold = None
         self.caps = self.caps_ff = None
         self.out_prefix = self.out_ext = ""
         self.enc_used = ""
         self._build()
         self.refresh_devices()
         self.apply_hotkeys()
+        self.apply_remote()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(250, self.pump)
 
@@ -595,6 +814,8 @@ class App:
         ttk.Button(row, text="Ouvrir le dossier", command=self.open_folder).pack(side="left", padx=4)
         self.lbl_hint = ttk.Label(main, text="", foreground="#777")
         self.lbl_hint.pack(side="bottom", pady=4)
+        self.lbl_remote = ttk.Label(main, text="", foreground="#777")
+        self.lbl_remote.pack(side="bottom")
 
         for title, fields in SCHEMA:
             tab = ttk.Frame(nb, padding=8)
@@ -694,6 +915,7 @@ class App:
         self.cfg = self.collect()
         save_config(self.cfg)
         self.apply_hotkeys()
+        self.apply_remote()
         self.update_hint()
         self.set_status("Réglages sauvegardés.")
 
@@ -909,7 +1131,7 @@ class App:
             return ""
 
     def on_stopped(self):
-        size = self.total_size()
+        size = self.last_size = self.total_size()
         self._reset_ui()
         if self.cfg["minimize_on_start"]:
             self.root.deiconify()
@@ -1039,6 +1261,120 @@ class App:
             self.cap_win.destroy()
             self.cap_win = None
 
+    # ---- télécommande & alertes mémoire ------------------------------------ #
+    def apply_remote(self):
+        if self.remote:
+            try:
+                self.remote.stop()
+            except Exception:
+                pass
+            self.remote = None
+        self.phone_connected = self.phone_lost = False
+        self.remote_last = 0.0
+        c = self.cfg
+        if c["remote_enabled"]:
+            if len(c["remote_pin"]) < 4:
+                messagebox.showwarning("Télécommande", "Le code PIN doit faire au moins 4 caractères.")
+            else:
+                try:
+                    self.remote = RemoteServer(self, c["remote_port"], c["remote_pin"])
+                    self.remote.start()
+                    self.remote_url = f"http://{local_ip()}:{c['remote_port']}"
+                except (OSError, OverflowError) as e:
+                    self.remote = None
+                    messagebox.showwarning("Télécommande", f"Impossible d'ouvrir le port {c['remote_port']} : {e}")
+        self.refresh_remote_label()
+
+    def refresh_remote_label(self):
+        if not self.remote:
+            txt = "Télécommande désactivée"
+        else:
+            state = "téléphone connecté" if self.phone_connected else "en attente du téléphone"
+            txt = f"Télécommande : {self.remote_url}   PIN {self.cfg['remote_pin']}   ({state})"
+        self.lbl_remote.config(text=txt)
+
+    def remote_seen(self, ip):  # appelé depuis le thread du serveur
+        self.remote_last = time.monotonic()
+
+    def tick(self, now):
+        """Appelé une fois par seconde : minuteur, mémoire, état du téléphone."""
+        ram = ram_percent()
+        self.ram_samples.append(ram)
+        warn = max(1, self.cfg["ram_warn"])
+        if self.recording and not self.stopping:
+            el = int(now - self.t0)
+            self.lbl_time.config(text=f"{el // 3600:02d}:{el // 60 % 60:02d}:{el % 60:02d}")
+            self.last_size = self.total_size()
+            self.lbl_size.config(text=fmt_size(self.last_size))
+        alert = ram >= warn
+        self.snap = {"recording": self.recording, "stopping": self.stopping,
+                     "elapsed": int(now - self.t0) if self.recording else 0, "size": self.last_size,
+                     "status": self.lbl_status.cget("text"), "encoder": self.enc_used,
+                     "ram": ram, "ram_alert": alert}
+        if self.remote:
+            timeout = max(3, self.cfg["remote_timeout"])
+            if self.remote_last and now - self.remote_last <= timeout:
+                if self.phone_lost:
+                    self.phone_lost = False
+                    if self.cfg["remote_notify"]:
+                        self.notify("Téléphone reconnecté", "La télécommande fonctionne de nouveau.", bad=False)
+                self.phone_connected = True
+            elif self.phone_connected:
+                self.phone_connected = False
+                self.phone_lost = True
+                self.on_phone_lost()
+            self.refresh_remote_label()
+        if alert and (self.recording or self.remote) and not self.ram_alerted:
+            self.ram_alerted = True
+            if self.cfg["remote_notify"]:
+                self.notify("Mémoire du PC presque saturée",
+                            f"RAM à {ram:.0f} %. L'enregistrement ou la télécommande risquent de saccader.")
+        elif ram < warn - 5:
+            self.ram_alerted = False
+
+    def on_phone_lost(self):
+        if not self.cfg["remote_notify"]:
+            return
+        peak = max([r for r in self.ram_samples if r >= 0] + [0.0])
+        extra = " L'enregistrement continue sur le PC." if self.recording else ""
+        if peak >= self.cfg["ram_warn"]:
+            msg = (f"Le téléphone s'est déconnecté, probablement par manque de mémoire : "
+                   f"la RAM du PC a atteint {peak:.0f} %.{extra}")
+        else:
+            msg = (f"Le téléphone s'est déconnecté. La RAM du PC est normale ({peak:.0f} % au plus) : "
+                   f"vérifie le Wi-Fi ou la mise en veille du téléphone.{extra}")
+        self.notify("Téléphone déconnecté", msg)
+
+    def notify(self, title, text, bad=True):
+        self.beep(not bad)
+        if PLAT == "linux" and shutil.which("notify-send"):
+            threading.Thread(target=run, args=(["notify-send", "-a", "LeFilou Rec", title, text], 5),
+                             daemon=True).start()
+        try:
+            if self._bold is None:
+                self._bold = tkfont.nametofont("TkDefaultFont").copy()
+                self._bold.configure(weight="bold")
+            bg = "#7a1620" if bad else "#1d5c3a"
+            w = tk.Toplevel(self.root)
+            w.overrideredirect(True)
+            try:
+                w.attributes("-topmost", True)
+            except tk.TclError:
+                pass
+            f = tk.Frame(w, bg=bg, padx=16, pady=12)
+            f.pack()
+            tk.Label(f, text=title, bg=bg, fg="white", font=self._bold).pack(anchor="w")
+            tk.Label(f, text=text, bg=bg, fg="white", wraplength=360, justify="left").pack(anchor="w")
+            w.update_idletasks()
+            x = w.winfo_screenwidth() - w.winfo_reqwidth() - 24
+            y = w.winfo_screenheight() - w.winfo_reqheight() - 70
+            w.geometry(f"+{x}+{y}")
+            for widget in (w, f):
+                widget.bind("<Button-1>", lambda e, w=w: w.destroy())
+            w.after(12000, lambda w=w: w.winfo_exists() and w.destroy())
+        except tk.TclError:
+            pass
+
     # ---- divers ------------------------------------------------------------ #
     def set_status(self, text):
         self.lbl_status.config(text=text)
@@ -1094,6 +1430,12 @@ class App:
                     self.toggle()
                 elif kind == "shot":
                     self.screenshot()
+                elif kind == "remote_start":
+                    if not (self.recording or self.stopping or self.counting):
+                        self.toggle()
+                elif kind == "remote_stop":
+                    if self.recording:
+                        self.stop()
                 elif kind == "stopped":
                     self.on_stopped()
                 elif kind == "msg":
@@ -1110,16 +1452,12 @@ class App:
                     self._close_capture()
         except queue.Empty:
             pass
-        if self.proc and not self.stopping:
-            if self.proc.poll() is not None:
-                self.on_crash()
-            else:
-                now = time.monotonic()
-                if now - self.last_ui >= 1:
-                    self.last_ui = now
-                    el = int(now - self.t0)
-                    self.lbl_time.config(text=f"{el // 3600:02d}:{el // 60 % 60:02d}:{el % 60:02d}")
-                    self.lbl_size.config(text=fmt_size(self.total_size()))
+        if self.proc and not self.stopping and self.proc.poll() is not None:
+            self.on_crash()
+        now = time.monotonic()
+        if now - self.last_tick >= 1:
+            self.last_tick = now
+            self.tick(now)
         self.root.after(250, self.pump)
 
     def on_close(self):
@@ -1140,11 +1478,37 @@ class App:
                 self.hk.stop()
             except Exception:
                 pass
+        if self.remote:
+            try:
+                self.remote.stop()
+            except Exception:
+                pass
         self.root.destroy()
 
     def run(self):
         self.root.mainloop()
 
 
+def main():
+    try:
+        App().run()
+    except Exception:
+        import traceback
+        tb = traceback.format_exc()
+        try:
+            with open(os.path.join(CONFIG_DIR, "crash.log"), "w", encoding="utf-8") as f:
+                f.write(tb)
+        except OSError:
+            pass
+        try:
+            r = tk.Tk()
+            r.withdraw()
+            messagebox.showerror("LeFilou Rec - erreur au lancement",
+                                 tb[-1500:] + f"\n\nJournal : {CONFIG_DIR}")
+        except Exception:
+            pass
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    App().run()
+    main()

@@ -12,6 +12,14 @@ avec encodeur matériel (NVENC, QuickSync, AMF, VAAPI, VideoToolbox) quand il es
    - macOS : `LeFilouRec-macos.dmg` (glisser dans Applications)
 3. Sans tag, « Run workflow » donne les mêmes fichiers dans l'onglet Actions (artefacts zippés par GitHub).
 
+## Télécommande Android
+1. Sur le PC : onglet **Télécommande** > cocher « Activer la télécommande » > *Sauvegarder les réglages*. L'adresse et le PIN s'affichent en bas de l'onglet « Enregistrer ».
+2. Sur le téléphone (même Wi-Fi) : installe `LeFilouRemote.apk` (release GitHub), entre l'adresse du PC. Sans APK, ouvre simplement cette adresse dans le navigateur.
+3. Depuis le téléphone : démarrer / arrêter, capture d'écran, état et RAM du PC.
+- Si le téléphone ne donne plus signe de vie, une alerte s'affiche sur le PC avec la cause probable : RAM du PC proche de la saturation, ou autre chose (Wi-Fi, veille du téléphone). L'enregistrement continue sans le téléphone.
+- Sécurité : désactivée par défaut, protégée par PIN (5 essais ratés = blocage 1 min), réseau local uniquement, trafic non chiffré. Ne l'expose jamais sur Internet.
+- Si le PC est vraiment gelé par manque de RAM, l'alerte peut n'apparaître qu'une fois la mémoire libérée.
+
 ## FFmpeg
 - **Windows** : `ffmpeg.exe` est inclus dans le zip.
 - **Linux** : le `.deb` installe FFmpeg tout seul ; avec l'AppImage : `sudo apt install ffmpeg`.
