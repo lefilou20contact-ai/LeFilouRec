@@ -42,11 +42,31 @@ install -m644 icon.png $A/lefilourec.png
 echo "${DESKTOP/EXECPATH/LeFilouRec}" > $A/lefilourec.desktop
 printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/LeFilouRec" "$@"\n' > $A/AppRun
 chmod +x $A/AppRun
+
+APPIMAGETOOL_URLS=(
+  "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+  "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+)
+
 if [ ! -x pkg/appimagetool ]; then
-  curl -fsSL -o pkg/appimagetool \
-    https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-  chmod +x pkg/appimagetool
+  mkdir -p pkg
+  for url in "${APPIMAGETOOL_URLS[@]}"; do
+    echo "Téléchargement de appimagetool depuis: $url"
+    if curl --fail --location --retry 5 --retry-all-errors --retry-delay 5 \
+      --connect-timeout 20 --max-time 300 -o pkg/appimagetool "$url"; then
+      break
+    fi
+    echo "Échec du téléchargement depuis $url, tentative suivante..." >&2
+    rm -f pkg/appimagetool
+  done
 fi
+
+if [ ! -x pkg/appimagetool ]; then
+  echo "Impossible de télécharger appimagetool. Vérifie la disponibilité du binaire sur GitHub." >&2
+  exit 1
+fi
+
+chmod +x pkg/appimagetool
 ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 pkg/appimagetool $A LeFilouRec-linux-x86_64.AppImage
 chmod +x LeFilouRec-linux-x86_64.AppImage
 ls -la LeFilouRec-linux-*
