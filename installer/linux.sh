@@ -15,14 +15,13 @@ Terminal=false"
 
 # ---------- .deb ----------
 D=pkg/deb
-rm -rf pkg
-mkdir -p "$D/DEBIAN" "$D/opt/lefilourec" "$D/usr/bin" "$D/usr/share/applications" \
-  "$D/usr/share/icons/hicolor/256x256/apps"
-install -m755 "$BIN" "$D/opt/lefilourec/LeFilouRec"
-ln -s /opt/lefilourec/LeFilouRec "$D/usr/bin/lefilourec"
-install -m644 icon.png "$D/usr/share/icons/hicolor/256x256/apps/lefilourec.png"
-echo "${DESKTOP/EXECPATH//usr/bin/lefilourec}" > "$D/usr/share/applications/lefilourec.desktop"
-cat > "$D/DEBIAN/control" <<EOT
+rm -rf pkg && mkdir -p $D/DEBIAN $D/opt/lefilourec $D/usr/bin $D/usr/share/applications \
+  $D/usr/share/icons/hicolor/256x256/apps
+install -m755 "$BIN" $D/opt/lefilourec/LeFilouRec
+ln -s /opt/lefilourec/LeFilouRec $D/usr/bin/lefilourec
+install -m644 icon.png $D/usr/share/icons/hicolor/256x256/apps/lefilourec.png
+echo "${DESKTOP/EXECPATH//usr/bin/lefilourec}" > $D/usr/share/applications/lefilourec.desktop
+cat > $D/DEBIAN/control <<EOT
 Package: lefilourec
 Version: $VER
 Section: video
@@ -33,7 +32,7 @@ Maintainer: LeFilou2.0 <noreply@users.noreply.github.com>
 Description: Enregistreur d'écran léger et configurable
  Interface légère, encodage matériel via FFmpeg, raccourcis clavier.
 EOT
-dpkg-deb --build --root-owner-group "$D" LeFilouRec-linux-amd64.deb
+dpkg-deb --build --root-owner-group $D LeFilouRec-linux-amd64.deb
 
 # ---------- AppImage ----------
 A=pkg/AppDir
@@ -56,17 +55,6 @@ if [ ! -x pkg/appimagetool ]; then
   [ "$ok" = 1 ] || { echo "Impossible de télécharger appimagetool"; exit 1; }
   chmod +x pkg/appimagetool
 fi
-
-if command -v appimagetool >/dev/null 2>&1; then
-  APPIMAGETOOL="$(command -v appimagetool)"
-else
-  APPIMAGETOOL="/tmp/appimagetool"
-  curl --fail --location --retry 10 --retry-all-errors --retry-delay 5 \
-    --connect-timeout 20 --max-time 300 -o "$APPIMAGETOOL" \
-    "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
-  chmod +x "$APPIMAGETOOL"
-fi
-
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGETOOL" "$A" LeFilouRec-linux-x86_64.AppImage
+ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 pkg/appimagetool $A LeFilouRec-linux-x86_64.AppImage
 chmod +x LeFilouRec-linux-x86_64.AppImage
 ls -la LeFilouRec-linux-*

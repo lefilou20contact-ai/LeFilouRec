@@ -61,6 +61,32 @@ CONFIG_DIR = config_dir()
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 LOG_FILE = os.path.join(CONFIG_DIR, "ffmpeg.log")
 
+ICON_B64 = (
+    "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")
+
 PRESETS = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow"]
 ALL_HW = ["h264_nvenc", "hevc_nvenc", "h264_qsv", "hevc_qsv", "h264_amf", "hevc_amf",
           "h264_vaapi", "hevc_vaapi", "h264_videotoolbox", "hevc_videotoolbox"]
@@ -117,9 +143,14 @@ CHOICES = {
     "log_level": [("error", "error"), ("warning", "warning"), ("info", "info")],
 }
 
+def SECTION(title):
+    return ("__section__", title, "section", "")
+
+
 # (clé, libellé, type, aide)
 SCHEMA = [
     ("Vidéo", [
+        SECTION("Capture"),
         ("capture_mode", "Zone à capturer", "choice", "Écran principal, région ou fenêtre."),
         ("region_x", "Région : X", "int", "Utilisé en mode région."),
         ("region_y", "Région : Y", "int", ""),
@@ -131,6 +162,7 @@ SCHEMA = [
         ("win_capture", "Méthode de capture (Windows)", "choice", "ddagrab utilise le GPU : très peu de CPU."),
         ("fps", "Images par seconde", "int", "30 conseillé pour économiser les ressources."),
         ("cursor", "Capturer le curseur", "bool", ""),
+        SECTION("Encodage"),
         ("out_height", "Redimensionner la sortie", "choice", "Réduire la résolution diminue fortement la charge."),
         ("encoder", "Encodeur", "choice", "Un encodeur matériel décharge le processeur."),
         ("preset", "Vitesse (preset)", "choice", "ultrafast = CPU minimal, fichiers plus gros."),
@@ -141,55 +173,66 @@ SCHEMA = [
         ("vaapi_device", "Périphérique VAAPI (Linux)", "str", ""),
     ]),
     ("Audio", [
+        SECTION("Son du système"),
         ("audio_system_on", "Enregistrer le son du système", "bool", ""),
         ("audio_system_dev", "Périphérique son système", "devchoice",
          "Windows : « Mixage stéréo » ou virtual-audio-capturer. Linux : @DEFAULT_MONITOR@. macOS : BlackHole/Loopback."),
         ("audio_system_vol", "Volume son système (%)", "int", ""),
+        SECTION("Micro"),
         ("audio_mic_on", "Enregistrer le micro", "bool", ""),
         ("audio_mic_dev", "Périphérique micro", "devchoice", ""),
         ("audio_mic_vol", "Volume micro (%)", "int", ""),
+        SECTION("Format audio"),
         ("audio_separate", "Pistes audio séparées", "bool", "Sinon les deux sources sont mélangées."),
         ("audio_codec", "Codec audio", "choice", ""),
         ("audio_bitrate", "Débit audio (kbps)", "int", ""),
     ]),
     ("Sortie", [
+        SECTION("Enregistrements"),
         ("output_dir", "Dossier d'enregistrement", "dir", ""),
         ("filename_pattern", "Nom du fichier", "str", "Codes date : %Y %m %d %H %M %S"),
         ("container", "Format", "choice", ""),
         ("mp4_fragmented", "MP4/MOV résistant aux crashs", "bool", "Fichier lisible même si l'enregistrement plante."),
         ("split_minutes", "Découper tous les (min)", "int", "0 = un seul fichier."),
+        ("open_folder_after", "Ouvrir le dossier à la fin", "bool", ""),
+        SECTION("Captures d'écran"),
         ("screenshot_dir", "Dossier des captures d'écran", "dir", "Vide = dossier d'enregistrement."),
         ("screenshot_format", "Format des captures", "choice", ""),
-        ("open_folder_after", "Ouvrir le dossier à la fin", "bool", ""),
     ]),
     ("Raccourcis", [
+        SECTION("Raccourcis globaux"),
         ("hotkeys_enabled", "Activer les raccourcis globaux", "bool", "Utilise pynput (X11 sous Linux)."),
         ("hotkey_record", "Démarrer / arrêter", "hotkey", ""),
         ("hotkey_screenshot", "Capture d'écran", "hotkey", ""),
+        SECTION("Comportement"),
         ("countdown", "Compte à rebours (s)", "int", "0 = démarrage immédiat."),
         ("minimize_on_start", "Réduire la fenêtre au démarrage", "bool", ""),
         ("beep", "Bip au démarrage / à l'arrêt", "bool", ""),
     ]),
     ("Performances", [
+        SECTION("Priorité et mémoire"),
         ("priority", "Priorité de FFmpeg", "choice", "« Basse » peut perdre des images si le CPU est saturé."),
         ("threads", "Threads de l'encodeur CPU", "int", "0 = automatique. 2 est un bon compromis."),
         ("rtbuf_mb", "Tampon temps réel (Mo)", "int", "Capture Windows (gdigrab/dshow)."),
         ("thread_queue", "File d'attente d'entrée", "int", ""),
+        SECTION("FFmpeg"),
         ("log_level", "Niveau de log FFmpeg", "choice", ""),
         ("ffmpeg_path", "Chemin de FFmpeg", "file", "Vide = automatique."),
         ("extra_output_args", "Arguments FFmpeg supplémentaires", "str", "Ajoutés avant le fichier de sortie."),
         ("dep_prompt", "Proposer d'installer les composants manquants", "bool", "FFmpeg, etc. Un mot de passe peut être demandé."),
     ]),
     ("Télécommande", [
+        SECTION("Téléphone"),
         ("remote_enabled", "Activer la télécommande", "bool", "Le téléphone doit être sur le même Wi-Fi que le PC."),
         ("remote_port", "Port", "int", "Change-le si 8765 est déjà pris."),
         ("remote_pin", "Code PIN", "str", "Demandé par le téléphone (4 caractères minimum)."),
+        SECTION("Alertes"),
         ("remote_notify", "Alerter sur le PC si le téléphone se déconnecte", "bool", "Fenêtre + bip, avec la cause probable."),
         ("ram_warn", "Seuil d'alerte mémoire (%)", "int", "Alerte quand la RAM du PC dépasse ce seuil."),
         ("remote_timeout", "Délai avant « déconnecté » (s)", "int", "Sans nouvelles du téléphone pendant ce temps."),
     ]),
 ]
-KIND = {k: kind for _, fields in SCHEMA for k, _, kind, _ in fields}
+KIND = {k: kind for _, fields in SCHEMA for k, _, kind, _ in fields if kind != "section"}
 
 MISSING_FFMPEG = {
     "win": "ffmpeg.exe est introuvable. Il doit se trouver à côté de LeFilouRec.exe (inclus dans le zip), "
@@ -794,17 +837,116 @@ def hk_key(kb, k):
 # --------------------------------------------------------------------------- #
 #  Interface
 # --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
+#  Thème (sombre, léger : uniquement ttk)
+# --------------------------------------------------------------------------- #
+THEME = {"bg": "#14141a", "panel": "#1c1c24", "field": "#262631", "line": "#3a3a48", "fg": "#ececf1",
+         "muted": "#8b8b99", "accent": "#e22832", "accent_h": "#ff3d47", "ok": "#35c58b"}
+
+
+def apply_theme(root):
+    t = THEME
+    fams = set(tkfont.families(root))
+    pref = {"win": ["Segoe UI"], "mac": ["Helvetica Neue", "Helvetica"],
+            "linux": ["Ubuntu", "Noto Sans", "Cantarell", "DejaVu Sans"]}[PLAT]
+    fam = next((f for f in pref if f in fams), None)
+    for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
+        f = tkfont.nametofont(name)
+        if fam:
+            f.configure(family=fam)
+        f.configure(size=10)
+    base = tkfont.nametofont("TkDefaultFont")
+    bold, title, timef, small = base.copy(), base.copy(), base.copy(), base.copy()
+    bold.configure(weight="bold")
+    title.configure(size=17, weight="bold")
+    timef.configure(size=34, weight="bold")
+    small.configure(size=9, weight="bold")
+    root._fonts = (bold, title, timef, small)  # garde les références
+
+    root.configure(bg=t["bg"])
+    root.option_add("*TCombobox*Listbox.background", t["field"])
+    root.option_add("*TCombobox*Listbox.foreground", t["fg"])
+    root.option_add("*TCombobox*Listbox.selectBackground", t["accent"])
+    root.option_add("*TCombobox*Listbox.selectForeground", "white")
+
+    st = ttk.Style(root)
+    st.theme_use("clam")
+    st.configure(".", background=t["bg"], foreground=t["fg"], fieldbackground=t["field"],
+                 bordercolor=t["line"], lightcolor=t["bg"], darkcolor=t["bg"], troughcolor=t["panel"],
+                 focuscolor=t["bg"], selectbackground=t["accent"], selectforeground="white",
+                 insertcolor=t["fg"])
+    st.configure("TFrame", background=t["bg"])
+    st.configure("Card.TFrame", background=t["panel"])
+    st.configure("TLabel", background=t["bg"], foreground=t["fg"])
+    st.configure("Muted.TLabel", foreground=t["muted"])
+    st.configure("Title.TLabel", font=title)
+    st.configure("Card.TLabel", background=t["panel"])
+    st.configure("CardMuted.TLabel", background=t["panel"], foreground=t["muted"])
+    st.configure("Time.TLabel", background=t["panel"], font=timef)
+    st.configure("Section.TLabel", foreground=t["accent"], font=small)
+    st.configure("TSeparator", background=t["line"])
+
+    st.configure("TNotebook", background=t["bg"], borderwidth=0, tabmargins=(0, 0, 0, 0))
+    st.configure("TNotebook.Tab", background=t["panel"], foreground=t["muted"], padding=(16, 9),
+                 borderwidth=0, bordercolor=t["bg"], lightcolor=t["panel"], darkcolor=t["panel"])
+    st.map("TNotebook.Tab",
+           background=[("selected", t["bg"]), ("active", t["field"])],
+           foreground=[("selected", t["fg"]), ("active", t["fg"])],
+           lightcolor=[("selected", t["bg"])], darkcolor=[("selected", t["bg"])],
+           expand=[("selected", (0, 0, 0, 0))])
+
+    def button(style, bg, hover, fg, font=None, pad=(14, 8)):
+        kw = dict(background=bg, foreground=fg, borderwidth=0, focusthickness=0, padding=pad,
+                  relief="flat", lightcolor=bg, darkcolor=bg, bordercolor=bg)
+        if font:
+            kw["font"] = font
+        st.configure(style, **kw)
+        st.map(style, background=[("pressed", hover), ("active", hover)],
+               lightcolor=[("pressed", hover), ("active", hover)],
+               darkcolor=[("pressed", hover), ("active", hover)],
+               bordercolor=[("pressed", hover), ("active", hover)])
+    button("TButton", t["field"], t["line"], t["fg"])
+    button("Accent.TButton", t["accent"], t["accent_h"], "white", bold, (18, 9))
+
+    st.configure("TEntry", fieldbackground=t["field"], foreground=t["fg"], insertcolor=t["fg"],
+                 bordercolor=t["line"], lightcolor=t["field"], darkcolor=t["field"], padding=(6, 5))
+    st.map("TEntry", bordercolor=[("focus", t["accent"])], lightcolor=[("focus", t["field"])])
+    st.configure("TCombobox", fieldbackground=t["field"], background=t["field"], foreground=t["fg"],
+                 arrowcolor=t["fg"], bordercolor=t["line"], lightcolor=t["field"], darkcolor=t["field"],
+                 padding=(6, 5), selectbackground=t["field"], selectforeground=t["fg"])
+    st.map("TCombobox", fieldbackground=[("readonly", t["field"])], foreground=[("readonly", t["fg"])],
+           selectbackground=[("readonly", t["field"])], selectforeground=[("readonly", t["fg"])],
+           background=[("active", t["line"])], bordercolor=[("focus", t["accent"])])
+    st.configure("TCheckbutton", background=t["bg"], foreground=t["fg"], indicatorbackground=t["field"],
+                 indicatorforeground="white", upperbordercolor=t["line"], lowerbordercolor=t["line"])
+    st.map("TCheckbutton", background=[("active", t["bg"])],
+           indicatorbackground=[("selected", t["accent"]), ("!selected", t["field"])],
+           indicatorforeground=[("selected", "white")])
+    st.configure("TScrollbar", background=t["field"], troughcolor=t["bg"], bordercolor=t["bg"],
+                 arrowcolor=t["muted"], lightcolor=t["field"], darkcolor=t["field"], relief="flat",
+                 gripcount=0)
+    st.map("TScrollbar", background=[("active", t["line"])])
+    for name, color in (("RamOk", t["ok"]), ("RamBad", t["accent"])):
+        st.configure(f"{name}.Horizontal.TProgressbar", background=color, troughcolor=t["field"],
+                     bordercolor=t["field"], lightcolor=color, darkcolor=color, thickness=8)
+
+
 class App:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title(f"LeFilou Rec {VERSION}")
-        self.root.geometry("800x660")
-        self.root.minsize(720, 560)
-        if PLAT == "linux":
-            try:
-                ttk.Style().theme_use("clam")
-            except tk.TclError:
-                pass
+        self.root.geometry("860x720")
+        self.root.minsize(780, 620)
+        apply_theme(self.root)
+        self._logo = self._icon = None
+        try:
+            self._icon = tk.PhotoImage(data=ICON_B64)
+            self.root.iconphoto(True, self._icon)
+            self._logo = self._icon.subsample(4, 4)
+        except tk.TclError:
+            pass
+        self._rec_state = self._rec_hover = False
         self.cfg = load_config()
         if not self.cfg["remote_pin"]:
             self.cfg["remote_pin"] = f"{secrets.randbelow(10 ** 6):06d}"
@@ -835,87 +977,163 @@ class App:
 
     # ---- construction de l'interface ------------------------------------- #
     def _build(self):
-        nb = ttk.Notebook(self.root)
-        nb.pack(fill="both", expand=True, padx=8, pady=(8, 4))
+        t = THEME
+        head = ttk.Frame(self.root, padding=(18, 14, 18, 2))
+        head.pack(fill="x")
+        if self._logo:
+            ttk.Label(head, image=self._logo).pack(side="left")
+        titles = ttk.Frame(head)
+        titles.pack(side="left", padx=12)
+        ttk.Label(titles, text="LeFilou Rec", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(titles, text="Enregistreur d'écran léger", style="Muted.TLabel").pack(anchor="w")
 
-        main = ttk.Frame(nb, padding=18)
+        nb = self.nb = ttk.Notebook(self.root)
+        nb.pack(fill="both", expand=True, padx=14, pady=(8, 6))
+        self.canvases, self.cur_canvas = {}, None
+
+        main = ttk.Frame(nb, padding=(18, 14))
         nb.add(main, text="Enregistrer")
-        self.btn = ttk.Button(main, text="●  Démarrer l'enregistrement", command=self.toggle)
-        self.btn.pack(fill="x", ipady=16)
-        big = tkfont.nametofont("TkDefaultFont").copy()
-        big.configure(size=30)
-        self._big = big
-        self.lbl_time = ttk.Label(main, text="00:00:00", font=big)
-        self.lbl_time.pack(pady=(24, 4))
-        self.lbl_size = ttk.Label(main, text="")
+        card = ttk.Frame(main, style="Card.TFrame", padding=(20, 18))
+        card.pack(fill="x")
+        c = self.rec_canvas = tk.Canvas(card, width=128, height=128, bg=t["panel"], highlightthickness=0,
+                                        bd=0, cursor="hand2")
+        c.pack()
+        c.bind("<Button-1>", lambda e: self.toggle())
+        c.bind("<Enter>", lambda e: self.draw_rec(hover=True))
+        c.bind("<Leave>", lambda e: self.draw_rec(hover=False))
+        self.lbl_cta = ttk.Label(card, text="Cliquer pour démarrer", style="CardMuted.TLabel")
+        self.lbl_cta.pack(pady=(4, 0))
+        self.lbl_time = ttk.Label(card, text="00:00:00", style="Time.TLabel")
+        self.lbl_time.pack(pady=(10, 0))
+        self.lbl_size = ttk.Label(card, text="", style="CardMuted.TLabel")
         self.lbl_size.pack()
-        self.lbl_status = ttk.Label(main, text="Prêt.", wraplength=700, justify="center")
-        self.lbl_status.pack(pady=14)
+        self.lbl_status = ttk.Label(card, text="Prêt.", style="Card.TLabel", wraplength=680, justify="center")
+        self.lbl_status.pack(pady=(10, 0))
         row = ttk.Frame(main)
-        row.pack(pady=6)
+        row.pack(pady=14)
         ttk.Button(row, text="Capture d'écran", command=self.screenshot).pack(side="left", padx=4)
         ttk.Button(row, text="Ouvrir le dossier", command=self.open_folder).pack(side="left", padx=4)
-        self.lbl_hint = ttk.Label(main, text="", foreground="#777")
-        self.lbl_hint.pack(side="bottom", pady=4)
-        self.lbl_remote = ttk.Label(main, text="", foreground="#777")
-        self.lbl_remote.pack(side="bottom")
+        ram = ttk.Frame(main)
+        ram.pack(fill="x", pady=(2, 0))
+        self.lbl_ram = ttk.Label(ram, text="RAM du PC", style="Muted.TLabel")
+        self.lbl_ram.pack(anchor="w")
+        self.ram_bar = ttk.Progressbar(ram, style="RamOk.Horizontal.TProgressbar", maximum=100,
+                                       mode="determinate")
+        self.ram_bar.pack(fill="x", pady=(4, 0))
+        self.lbl_hint = ttk.Label(main, text="", style="Muted.TLabel")
+        self.lbl_hint.pack(side="bottom", anchor="w", pady=(0, 2))
 
         for title, fields in SCHEMA:
-            tab = ttk.Frame(nb, padding=8)
+            outer, tab = self._scroll_tab()
+            nb.add(outer, text=title)
             tab.columnconfigure(2, weight=1)
-            nb.add(tab, text=title)
             for r, (key, label, kind, hint) in enumerate(fields):
                 self._field(tab, r, key, label, kind, hint)
             if title == "Performances":
+                self._field(tab, len(fields), "", "Outils", "section", "")
                 bar = ttk.Frame(tab)
-                bar.grid(row=len(fields), column=0, columnspan=3, sticky="w", pady=12, padx=8)
-                for text, cmd in (("Détecter encodeurs / périphériques", self.detect_encoders),
-                                  ("Voir la commande FFmpeg", self.show_command),
-                                  ("Journal FFmpeg", self.show_log),
-                                  ("Dossier de config", lambda: self.open_folder(CONFIG_DIR))):
-                    ttk.Button(bar, text=text, command=cmd).pack(side="left", padx=3)
+                bar.grid(row=len(fields) + 1, column=0, columnspan=3, sticky="w", padx=4)
+                tools = (("Détecter encodeurs / périphériques", self.detect_encoders),
+                         ("Voir la commande FFmpeg", self.show_command),
+                         ("Journal FFmpeg", self.show_log),
+                         ("Dossier de config", lambda: self.open_folder(CONFIG_DIR)))
+                for i, (text, cmd) in enumerate(tools):
+                    ttk.Button(bar, text=text, command=cmd).grid(row=i // 2, column=i % 2, sticky="ew",
+                                                                 padx=3, pady=3)
+        nb.bind("<<NotebookTabChanged>>", lambda e: setattr(self, "cur_canvas", self.canvases.get(nb.select())))
+        for ev in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            self.root.bind_all(ev, self._wheel)
 
-        bottom = ttk.Frame(self.root)
-        bottom.pack(fill="x", padx=8, pady=(0, 8))
-        ttk.Button(bottom, text="Sauvegarder les réglages", command=self.save_settings).pack(side="left")
-        ttk.Button(bottom, text="Importer…", command=self.import_cfg).pack(side="left", padx=4)
+        bottom = ttk.Frame(self.root, padding=(14, 0, 14, 12))
+        bottom.pack(fill="x")
+        ttk.Button(bottom, text="Sauvegarder les réglages", style="Accent.TButton",
+                   command=self.save_settings).pack(side="left")
+        ttk.Button(bottom, text="Importer…", command=self.import_cfg).pack(side="left", padx=6)
         ttk.Button(bottom, text="Exporter…", command=self.export_cfg).pack(side="left")
         ttk.Button(bottom, text="Valeurs par défaut", command=self.reset_cfg).pack(side="right")
+        foot = ttk.Frame(self.root, padding=(16, 0, 16, 8))
+        foot.pack(fill="x")
+        self.lbl_remote = ttk.Label(foot, text="", style="Muted.TLabel")
+        self.lbl_remote.pack(side="right")
+        self.draw_rec(False)
         self.update_hint()
 
+    def _scroll_tab(self):
+        outer = ttk.Frame(self.nb)
+        canvas = tk.Canvas(outer, bg=THEME["bg"], highlightthickness=0, bd=0)
+        sb = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        inner = ttk.Frame(canvas, padding=(14, 6, 14, 14))
+        win = canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
+        canvas.configure(yscrollcommand=sb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+        self.canvases[str(outer)] = canvas
+        return outer, inner
+
+    def _wheel(self, e):
+        if self.cur_canvas is not None:
+            up = getattr(e, "num", 0) == 4 or getattr(e, "delta", 0) > 0
+            self.cur_canvas.yview_scroll(-2 if up else 2, "units")
+
+    def draw_rec(self, recording=None, hover=None):
+        if recording is not None:
+            self._rec_state = recording
+        if hover is not None:
+            self._rec_hover = hover
+        t, c = THEME, self.rec_canvas
+        c.delete("all")
+        if self._rec_state:
+            c.create_oval(12, 12, 116, 116, outline=t["accent"], width=4)
+            c.create_rectangle(44, 44, 84, 84, fill=t["accent"], outline=t["accent"])
+            self.lbl_cta.config(text="Cliquer pour arrêter")
+        else:
+            c.create_oval(12, 12, 116, 116, outline=t["accent_h"] if self._rec_hover else "#f0f0f0", width=4)
+            c.create_oval(30, 30, 98, 98, fill=t["accent_h"] if self._rec_hover else t["accent"], outline="")
+            self.lbl_cta.config(text="Cliquer pour démarrer")
+
     def _field(self, parent, row, key, label, kind, hint):
-        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(8, 6), pady=3)
+        if kind == "section":
+            f = ttk.Frame(parent)
+            ttk.Label(f, text=label.upper(), style="Section.TLabel").pack(anchor="w")
+            ttk.Separator(f, orient="horizontal").pack(fill="x", pady=(3, 0))
+            f.grid(row=row, column=0, columnspan=3, sticky="ew", padx=4, pady=(16 if row else 2, 6))
+            return
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="nw", padx=(6, 12), pady=(9, 4))
+        cell = ttk.Frame(parent)
+        cell.grid(row=row, column=1, columnspan=2, sticky="w", pady=4)
         val = self.cfg[key]
         if kind == "bool":
             v = tk.BooleanVar(value=bool(val))
-            w = ttk.Checkbutton(parent, variable=v)
+            w = ttk.Checkbutton(cell, variable=v)
         elif kind == "choice":
             v = tk.StringVar(value=choice_label(key, val))
-            w = ttk.Combobox(parent, textvariable=v, state="readonly", width=34,
+            w = ttk.Combobox(cell, textvariable=v, state="readonly", width=34,
                              values=[lab for _, lab in CHOICES[key]])
         elif kind == "devchoice":
             v = tk.StringVar(value=str(val))
-            w = ttk.Combobox(parent, textvariable=v, width=48)
+            w = ttk.Combobox(cell, textvariable=v, width=44)
             self.devboxes.append(w)
         elif kind in ("dir", "file"):
             v = tk.StringVar(value=str(val))
-            w = ttk.Frame(parent)
-            ttk.Entry(w, textvariable=v, width=44).pack(side="left", fill="x", expand=True)
+            w = ttk.Frame(cell)
+            ttk.Entry(w, textvariable=v, width=40).pack(side="left", fill="x", expand=True)
             ttk.Button(w, text="…", width=3, command=lambda v=v, k=kind: self._browse(v, k)).pack(
                 side="left", padx=(4, 0))
         elif kind == "hotkey":
             v = tk.StringVar(value=str(val))
-            w = ttk.Frame(parent)
-            ttk.Entry(w, textvariable=v, width=30).pack(side="left")
+            w = ttk.Frame(cell)
+            ttk.Entry(w, textvariable=v, width=26).pack(side="left")
             ttk.Button(w, text="Définir…", command=lambda v=v: self.capture_hotkey(v)).pack(
                 side="left", padx=(4, 0))
         else:
             v = tk.StringVar(value=str(val))
-            w = ttk.Entry(parent, textvariable=v, width=10 if kind == "int" else 48)
-        w.grid(row=row, column=1, sticky="w", pady=3)
+            w = ttk.Entry(cell, textvariable=v, width=10 if kind == "int" else 44)
+        w.pack(anchor="w")
         if hint:
-            ttk.Label(parent, text=hint, foreground="#777", wraplength=260, justify="left").grid(
-                row=row, column=2, sticky="w", padx=8)
+            ttk.Label(cell, text=hint, style="Muted.TLabel", wraplength=430, justify="left").pack(
+                anchor="w", pady=(3, 0))
         self.vars[key] = v
 
     def _browse(self, var, kind):
@@ -1131,7 +1349,7 @@ class App:
             return
         self.recording = True
         self.t0 = time.monotonic()
-        self.btn.config(text="■  Arrêter l'enregistrement")
+        self.draw_rec(True)
         self.set_status(f"Enregistrement en cours — encodeur : {enc}")
         self.beep(True)
         if cfg["minimize_on_start"]:
@@ -1167,7 +1385,7 @@ class App:
             except OSError:
                 pass
             self.logf = None
-        self.btn.config(text="●  Démarrer l'enregistrement")
+        self.draw_rec(False)
         self.lbl_time.config(text="00:00:00")
 
     def log_tail(self, n=12):
@@ -1270,7 +1488,7 @@ class App:
             return
         if self.cap_win:
             return
-        win = self.cap_win = tk.Toplevel(self.root)
+        win = self.cap_win = tk.Toplevel(self.root, bg=THEME["bg"])
         win.title("Nouveau raccourci")
         ttk.Label(win, text="Appuie sur la combinaison voulue…\n(Échap pour annuler)", padding=24).pack()
         mods = set()
@@ -1310,6 +1528,7 @@ class App:
 
     # ---- télécommande & alertes mémoire ------------------------------------ #
     def apply_remote(self):
+        self.ip = local_ip()
         if self.remote:
             try:
                 self.remote.stop()
@@ -1333,11 +1552,12 @@ class App:
         self.refresh_remote_label()
 
     def refresh_remote_label(self):
+        ip = getattr(self, "ip", "") or local_ip()
         if not self.remote:
-            txt = "Télécommande désactivée"
+            txt = f"IP du PC : {ip}   ·   télécommande désactivée"
         else:
             state = "téléphone connecté" if self.phone_connected else "en attente du téléphone"
-            txt = f"Télécommande : {self.remote_url}   PIN {self.cfg['remote_pin']}   ({state})"
+            txt = f"{self.remote_url}   ·   PIN {self.cfg['remote_pin']}   ·   {state}"
         self.lbl_remote.config(text=txt)
 
     def remote_seen(self, ip):  # appelé depuis le thread du serveur
@@ -1354,6 +1574,10 @@ class App:
             self.last_size = self.total_size()
             self.lbl_size.config(text=fmt_size(self.last_size))
         alert = ram >= warn
+        if ram >= 0:
+            self.ram_bar["value"] = ram
+            self.ram_bar.configure(style=("RamBad" if alert else "RamOk") + ".Horizontal.TProgressbar")
+            self.lbl_ram.config(text=f"RAM du PC : {ram:.0f} %")
         self.snap = {"recording": self.recording, "stopping": self.stopping,
                      "elapsed": int(now - self.t0) if self.recording else 0, "size": self.last_size,
                      "status": self.lbl_status.cget("text"), "encoder": self.enc_used,
@@ -1480,7 +1704,9 @@ class App:
         w = tk.Toplevel(self.root)
         w.title(title)
         w.geometry("760x380")
-        t = tk.Text(w, wrap="word")
+        w.configure(bg=THEME["bg"])
+        t = tk.Text(w, wrap="word", bg=THEME["field"], fg=THEME["fg"], insertbackground=THEME["fg"],
+                    relief="flat", padx=10, pady=10)
         t.insert("1.0", text)
         t.pack(fill="both", expand=True)
         ttk.Button(w, text="Copier", command=lambda: (self.root.clipboard_clear(),
