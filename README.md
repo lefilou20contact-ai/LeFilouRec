@@ -12,6 +12,13 @@ avec encodeur matériel (NVENC, QuickSync, AMF, VAAPI, VideoToolbox) quand il es
    - macOS : `LeFilouRec-macos.dmg` (glisser dans Applications)
 3. Sans tag, « Run workflow » donne les mêmes fichiers dans l'onglet Actions (artefacts zippés par GitHub).
 
+## Composants manquants
+Au lancement (et au démarrage d'un enregistrement), si FFmpeg ou un utilitaire est absent, le logiciel propose de l'installer :
+- **Linux** : fenêtre graphique de mot de passe (`pkexec`), via apt, dnf, pacman ou zypper. Installe FFmpeg, `pactl` (périphériques audio) et `xrandr` (détection de l'écran).
+- **Windows** : `winget install Gyan.FFmpeg` (FFmpeg est normalement déjà inclus).
+- **macOS** : `brew install ffmpeg` si Homebrew est présent.
+Désactivable dans *Performances > Proposer d'installer les composants manquants*. Testé sous Linux (apt) ; Windows et macOS non testés.
+
 ## Télécommande Android
 1. Sur le PC : onglet **Télécommande** > cocher « Activer la télécommande » > *Sauvegarder les réglages*. L'adresse et le PIN s'affichent en bas de l'onglet « Enregistrer ».
 2. Sur le téléphone (même Wi-Fi) : installe `LeFilouRemote.apk` (release GitHub), entre l'adresse du PC. Sans APK, ouvre simplement cette adresse dans le navigateur.

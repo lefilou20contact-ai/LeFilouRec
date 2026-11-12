@@ -28,7 +28,7 @@ Version: $VER
 Section: video
 Priority: optional
 Architecture: amd64
-Depends: ffmpeg
+Depends: ffmpeg, x11-xserver-utils, pulseaudio-utils
 Maintainer: LeFilou2.0 <noreply@users.noreply.github.com>
 Description: Enregistreur d'écran léger et configurable
  Interface légère, encodage matériel via FFmpeg, raccourcis clavier.
@@ -37,20 +37,24 @@ dpkg-deb --build --root-owner-group "$D" LeFilouRec-linux-amd64.deb
 
 # ---------- AppImage ----------
 A=pkg/AppDir
-mkdir -p "$A"
-install -m755 "$BIN" "$A/LeFilouRec"
-install -m644 icon.png "$A/lefilourec.png"
-echo "${DESKTOP/EXECPATH/LeFilouRec}" > "$A/lefilourec.desktop"
-cat > "$A/AppRun" <<'EOF'
-#!/bin/sh
-exec "$(dirname "$(readlink -f "$0")")/LeFilouRec" "$@"
-EOF
-chmod +x "$A/AppRun"
-
-# Install appimagetool from Ubuntu when available; fall back to the official release.
-if ! command -v appimagetool >/dev/null 2>&1; then
-  sudo apt-get update
-  sudo apt-get install -y appimagetool || true
+mkdir -p $A
+install -m755 "$BIN" $A/LeFilouRec
+install -m644 icon.png $A/lefilourec.png
+echo "${DESKTOP/EXECPATH/LeFilouRec}" > $A/lefilourec.desktop
+printf '#!/bin/sh\nexec "$(dirname "$(readlink -f "$0")")/LeFilouRec" "$@"\n' > $A/AppRun
+chmod +x $A/AppRun
+if [ ! -x pkg/appimagetool ]; then
+  ok=0
+  for url in \
+    https://github.com/AppImage/appimagetool/releases/download/1.9.0/appimagetool-x86_64.AppImage \
+    https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage; do
+    for i in 1 2 3 4; do
+      if curl -fsSL -o pkg/appimagetool "$url"; then ok=1; break 2; fi
+      echo "Essai $i échoué ($url)"; sleep $((15 * i))
+    done
+  done
+  [ "$ok" = 1 ] || { echo "Impossible de télécharger appimagetool"; exit 1; }
+  chmod +x pkg/appimagetool
 fi
 
 if command -v appimagetool >/dev/null 2>&1; then

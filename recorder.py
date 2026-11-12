@@ -87,7 +87,7 @@ DEFAULTS = {
     "countdown": 0, "minimize_on_start": True, "beep": True,
     # Performances & avancé
     "priority": "below", "threads": 2, "rtbuf_mb": 64, "thread_queue": 512, "log_level": "warning",
-    "ffmpeg_path": "", "extra_output_args": "",
+    "ffmpeg_path": "", "extra_output_args": "", "dep_prompt": True,
     # Télécommande (téléphone)
     "remote_enabled": False, "remote_port": 8765, "remote_pin": "", "remote_notify": True,
     "ram_warn": 90, "remote_timeout": 8,
@@ -178,6 +178,7 @@ SCHEMA = [
         ("log_level", "Niveau de log FFmpeg", "choice", ""),
         ("ffmpeg_path", "Chemin de FFmpeg", "file", "Vide = automatique."),
         ("extra_output_args", "Arguments FFmpeg supplémentaires", "str", "Ajoutés avant le fichier de sortie."),
+        ("dep_prompt", "Proposer d'installer les composants manquants", "bool", "FFmpeg, etc. Un mot de passe peut être demandé."),
     ]),
     ("Télécommande", [
         ("remote_enabled", "Activer la télécommande", "bool", "Le téléphone doit être sur le même Wi-Fi que le PC."),
@@ -196,6 +197,44 @@ MISSING_FFMPEG = {
     "linux": "FFmpeg est introuvable. Installe-le :\n  sudo apt install ffmpeg\n(ou le paquet équivalent de ta distribution).",
     "mac": "FFmpeg est introuvable. Installe-le avec Homebrew :\n  brew install ffmpeg",
 }
+
+
+class MissingFFmpeg(RuntimeError):
+    pass
+
+
+DEP_LABELS = {"ffmpeg": "FFmpeg (obligatoire)", "pactl": "pactl (liste des périphériques audio)",
+              "xrandr": "xrandr (détection de l'écran)"}
+LINUX_PKGS = {  # commande -> paquet selon le gestionnaire de paquets
+    "ffmpeg": {"apt-get": "ffmpeg", "dnf": "ffmpeg-free", "pacman": "ffmpeg", "zypper": "ffmpeg"},
+    "pactl": {"apt-get": "pulseaudio-utils", "dnf": "pulseaudio-utils", "pacman": "libpulse",
+              "zypper": "pulseaudio-utils"},
+    "xrandr": {"apt-get": "x11-xserver-utils", "dnf": "xrandr", "pacman": "xorg-xrandr", "zypper": "xrandr"},
+}
+
+
+def install_command(missing):
+    """Commande d'installation (avec fenêtre graphique de mot de passe), ou None."""
+    if PLAT == "linux":
+        pm = next((p for p in ("apt-get", "dnf", "pacman", "zypper") if shutil.which(p)), None)
+        if not pm or not shutil.which("pkexec"):
+            return None
+        names = " ".join(LINUX_PKGS[m][pm] for m in missing if m in LINUX_PKGS)
+        inner = {"apt-get": f"apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y {names}",
+                 "dnf": f"dnf install -y {names}",
+                 "pacman": f"pacman -S --noconfirm --needed {names}",
+                 "zypper": f"zypper --non-interactive install {names}"}[pm]
+        return ["pkexec", "sh", "-c", inner]
+    if "ffmpeg" not in missing:
+        return None
+    if PLAT == "win" and shutil.which("winget"):
+        return ["winget", "install", "-e", "--id", "Gyan.FFmpeg",
+                "--accept-source-agreements", "--accept-package-agreements"]
+    if PLAT == "mac":
+        brew = next((p for p in ("/opt/homebrew/bin/brew", "/usr/local/bin/brew") if os.path.isfile(p)), None)
+        if brew:
+            return [brew, "install", "ffmpeg"]
+    return None
 
 
 def load_config(path=CONFIG_FILE):
@@ -254,6 +293,8 @@ def find_ffmpeg(custom=""):
     dirs = [here, os.path.join(here, "bin"), os.path.join(here, "_internal")]
     if PLAT != "win":
         dirs += ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+    else:
+        dirs.append(os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Links"))
     for d in dirs:
         p = os.path.join(d, name)
         if os.path.isfile(p):
@@ -789,6 +830,8 @@ class App:
         self.apply_remote()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(250, self.pump)
+        if self.cfg["dep_prompt"]:
+            self.root.after(800, self.check_deps)
 
     # ---- construction de l'interface ------------------------------------- #
     def _build(self):
@@ -992,7 +1035,7 @@ class App:
     def prepare(self, cfg):
         ff = find_ffmpeg(cfg["ffmpeg_path"])
         if not ff:
-            raise RuntimeError(MISSING_FFMPEG[PLAT])
+            raise MissingFFmpeg(MISSING_FFMPEG[PLAT])
         if cfg["capture_mode"] == "window":
             if PLAT != "win":
                 raise RuntimeError("Le mode fenêtre n'existe que sous Windows : utilise une région.")
@@ -1057,6 +1100,10 @@ class App:
         save_config(cfg)
         try:
             cmd, enc, self.out_prefix, self.out_ext = self.prepare(cfg)
+        except MissingFFmpeg:
+            self.set_status("Prêt.")
+            self.offer_install(["ffmpeg"])
+            return
         except RuntimeError as e:
             self.set_status("Prêt.")
             messagebox.showerror("Impossible de démarrer", str(e))
@@ -1375,6 +1422,35 @@ class App:
         except tk.TclError:
             pass
 
+    # ---- composants manquants --------------------------------------------- #
+    def check_deps(self):
+        missing = []
+        if not self.ffmpeg():
+            missing.append("ffmpeg")
+        if PLAT == "linux":
+            missing += [c for c in ("pactl", "xrandr") if not shutil.which(c)]
+        if missing:
+            self.offer_install(missing)
+
+    def offer_install(self, missing):
+        label = ", ".join(DEP_LABELS.get(m, m) for m in missing)
+        cmd = install_command(missing)
+        if not cmd:
+            messagebox.showinfo("Composants manquants", f"Il manque : {label}.\n\n{MISSING_FFMPEG[PLAT]}")
+            return
+        pwd = {"linux": "Une fenêtre te demandera ton mot de passe.",
+               "win": "Windows peut te demander une confirmation.", "mac": ""}[PLAT]
+        if not messagebox.askyesno("Composants manquants", f"Il manque : {label}.\n\nL'installer maintenant ? {pwd}"):
+            return
+        self.set_status("Installation en cours… valide avec ton mot de passe si on te le demande.")
+
+        def work():
+            r = run(cmd, 1200)
+            out = ((r.stderr or r.stdout) if r else "")[-400:]
+            self.q.put(("installed", (bool(r and r.returncode == 0), r.returncode if r else -1, out)))
+
+        threading.Thread(target=work, daemon=True).start()
+
     # ---- divers ------------------------------------------------------------ #
     def set_status(self, text):
         self.lbl_status.config(text=text)
@@ -1440,6 +1516,17 @@ class App:
                     self.on_stopped()
                 elif kind == "msg":
                     self.set_status(data)
+                elif kind == "installed":
+                    ok, rc, tail = data
+                    self.caps = None
+                    if ok:
+                        self.refresh_devices()
+                        self.set_status("Installation terminée : tu peux enregistrer.")
+                    elif rc in (126, 127):
+                        self.set_status("Installation annulée (mot de passe refusé ou fenêtre fermée).")
+                    else:
+                        self.set_status("L'installation a échoué.")
+                        messagebox.showerror("Installation", f"Code {rc}.\n\n{tail}")
                 elif kind == "text":
                     self.set_status("Prêt.")
                     self.refresh_devices()
